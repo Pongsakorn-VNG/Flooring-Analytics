@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Flooring Dashboard | สรุปยอดขายประจำปี 2025-2026</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- html2pdf.js for Export PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap');
+    body {
+      font-family: 'Prompt', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+
+  <!-- Navigation Bar -->
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm" id="headerNav">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+          <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+            ระบบสรุปยอดขาย Flooring Analytics
+          </h1>
+          <p class="text-xs text-slate-500">Dashboard วิเคราะห์ยอดขายประจำปี 2025 - 2026 (หน่วย: ตร.ม. / m²)</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center flex-wrap gap-2">
+        <div id="dataSourceBadge" class="hidden items-center gap-1.5 px-3 py-1 rounded-lg text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span id="dataSourceText">ดึงข้อมูลจาก Google Sheets</span>
+        </div>
+        <button onclick="fetchFromGoogleSheet(true)" title="ดึงข้อมูลสดใหม่จาก Google Sheets" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>รีเฟรช Google Sheet</span>
+        </button>
+        <label class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 shadow-sm transition">
+          <i data-lucide="file-up" class="w-3.5 h-3.5 text-sky-600"></i>
+          <span>อัปโหลด CSV</span>
+          <input type="file" id="csvFileInput" accept=".csv" onchange="handleFileUpload(event)" class="hidden" />
+        </label>
+        <button onclick="clearStoredData()" title="ลบข้อมูลที่บันทึกไว้ในเบราว์เซอร์" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-transparent transition">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          ล้างแคช
+        </button>
+        <button onclick="resetFilters()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          รีเซ็ตตัวกรอง
+        </button>
+        <button onclick="exportCSV()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-sky-600 hover:bg-sky-700 shadow-sm transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          ส่งออก CSV
+        </button>
+        <!-- เพิ่มปุ่ม Export PDF -->
+        <button onclick="exportPDF()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition">
+          <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+          ส่งออก PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" id="dashboardContent">
+
+    <!-- Filters Section -->
+    <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+      <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-sky-600"></i>
+        <span class="text-sm font-bold text-slate-700">ตัวกรองข้อมูลเชิงลึก (Interactive Filters)</span>
+        <span id="filteredCountBadge" class="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 font-medium">กำลังโหลดข้อมูล...</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <!-- Year Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">ปี (Year)</label>
+          <select id="filterYear" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+            <option value="ALL">ทั้งหมด (2025-2026)</option>
+            <option value="2025">ปี 2025</option>
+            <option value="2026">ปี 2026</option>
+          </select>
+        </div>
+
+        <!-- Month Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">เดือน (Month)</label>
+          <select id="filterMonth" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500">
+            <option value="ALL">ทุกเดือน (All Months)</option>
+            <option value="Jan">มกราคม (Jan)</option>
+            <option value="Feb">กุมภาพันธ์ (Feb)</option>
+            <option value="Mar">มีนาคม (Mar)</option>
+            <option value="Apr">เมษายน (Apr)</option>
+            <option value="May">พฤษภาคม (May)</option>
+            <option value="Jun">มิถุนายน (Jun)</option>
+            <option value="Jul">กรกฎาคม (Jul)</option>
+            <option value="Aug">สิงหาคม (Aug)</option>
+            <option value="Sep">กันยายน (Sep)</option>
+            <option value="Oct">ตุลาคม (Oct)</option>
+            <option value="Nov">พฤศจิกายน (Nov)</option>
+            <option value="Dec">ธันวาคม (Dec)</option>
+          </select>
+        </div>
+
+        <!-- Market Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">ตลาด (Lo/Ex)</label>
+          <select id="filterMarket" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500">
+            <option value="ALL">ทั้งหมด (Local & Export)</option>
+            <option value="Local">ในประเทศ (Local)</option>
+            <option value="Export">ต่างประเทศ (Export)</option>
+          </select>
+        </div>
+
+        <!-- Board Type Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Type Board</label>
+          <select id="filterType" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500">
+            <option value="ALL">ทุกประเภท (All Types)</option>
+          </select>
+        </div>
+
+        <!-- Thickness Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">ความหนา (Thickness)</label>
+          <select id="filterThickness" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500">
+            <option value="ALL">ทุกขนาด (All)</option>
+            <option value="8">8 มม. (8 mm)</option>
+            <option value="12">12 มม. (12 mm)</option>
+          </select>
+        </div>
+
+        <!-- Customer Search / Select -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">ลูกค้า (Customer)</label>
+          <select id="filterCustomer" onchange="applyFilters()" class="w-full text-xs rounded-lg border-slate-300 bg-slate-50 px-2.5 py-2 text-slate-700 focus:bg-white focus:border-sky-500">
+            <option value="ALL">ทุกลูกค้า (All)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Metric Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <!-- Total Sales -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 relative overflow-hidden group hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">ยอดขายรวมทั้งหมด</span>
+          <div class="p-2 rounded-xl bg-sky-50 text-sky-600 group-hover:bg-sky-600 group-hover:text-white transition">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-slate-900" id="kpiTotalSales">-</div>
+        <p class="text-[11px] text-slate-500 mt-1">พื้นที่ขายรวม (ตร.ม.)</p>
+      </div>
+
+      <!-- Local Sales -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 relative overflow-hidden group hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">ยอดขายในประเทศ</span>
+          <div class="p-2 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition">
+            <i data-lucide="home" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-emerald-600" id="kpiLocalSales">-</div>
+        <p class="text-[11px] text-slate-500 mt-1" id="kpiLocalRatio">สัดส่วน: -%</p>
+      </div>
+
+      <!-- Export Sales -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 relative overflow-hidden group hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">ยอดขายต่างประเทศ</span>
+          <div class="p-2 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition">
+            <i data-lucide="globe" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-indigo-600" id="kpiExportSales">-</div>
+        <p class="text-[11px] text-slate-500 mt-1" id="kpiExportRatio">สัดส่วน: -%</p>
+      </div>
+
+      <!-- Top Customer -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 relative overflow-hidden group hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">ลูกค้าอันดับ 1</span>
+          <div class="p-2 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition">
+            <i data-lucide="trophy" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-lg font-bold text-slate-900 truncate" id="kpiTopCustomer">-</div>
+        <p class="text-[11px] text-slate-500 mt-1" id="kpiTopCustomerVol">ยอด: - ตร.ม.</p>
+      </div>
+
+      <!-- Top Color Code -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 relative overflow-hidden group hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Code สีขายดีสุด</span>
+          <div class="p-2 rounded-xl bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition">
+            <i data-lucide="palette" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-lg font-bold text-rose-600 truncate" id="kpiTopColor">-</div>
+        <p class="text-[11px] text-slate-500 mt-1" id="kpiTopColorVol">ยอด: - ตร.ม.</p>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="flex border-b border-slate-200 space-x-2 overflow-x-auto custom-scrollbar pb-1">
+      <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-sky-600 text-sky-600 bg-sky-50/50">
+        ภาพรวมทั้งหมด (Overview)
+      </button>
+      <button onclick="switchTab('topic1')" id="tab-topic1" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        1. ใน/ต่างประเทศ
+      </button>
+      <button onclick="switchTab('topic2')" id="tab-topic2" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        2. รายลูกค้า
+      </button>
+      <button onclick="switchTab('topic3')" id="tab-topic3" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        3. Code สี
+      </button>
+      <button onclick="switchTab('topic4')" id="tab-topic4" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        4. ขนาดความหนา
+      </button>
+      <button onclick="switchTab('topic5')" id="tab-topic5" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        5. Type Board
+      </button>
+      <button onclick="switchTab('table')" id="tab-table" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-transparent text-slate-600 hover:text-sky-600">
+        ตารางข้อมูลดิบ (Data Explorer)
+      </button>
+    </div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <div id="content-overview" class="tab-content space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">แนวโน้มยอดขายรายเดือน (Monthly Sales Trend)</h3>
+              <p class="text-xs text-slate-500">เปรียบเทียบยอดขายในประเทศ vs ต่างประเทศ</p>
+            </div>
+            <span class="text-xs text-sky-600 bg-sky-50 px-2 py-1 rounded-md font-medium">ตร.ม.</span>
+          </div>
+          <div class="h-72">
+            <canvas id="chartMonthlyTrend"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">สัดส่วนตามตลาด & ขนาดความหนา</h3>
+              <p class="text-xs text-slate-500">Local/Export & Thickness (8mm vs 12mm)</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 h-72 items-center">
+            <div class="h-64 flex flex-col items-center justify-center">
+              <canvas id="chartMarketShareMini"></canvas>
+              <span class="text-xs font-semibold text-slate-600 mt-2">ตลาด (Market)</span>
+            </div>
+            <div class="h-64 flex flex-col items-center justify-center">
+              <canvas id="chartThicknessMini"></canvas>
+              <span class="text-xs font-semibold text-slate-600 mt-2">ความหนา (Thickness)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+            <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
+            Top 5 ลูกค้ายอดซื้อสูงสุด
+          </h3>
+          <div id="overviewTopCustomersList" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+            <i data-lucide="palette" class="w-4 h-4 text-rose-600"></i>
+            Top 5 โค้ดสีขายดีที่สุด
+          </h3>
+          <div id="overviewTopColorsList" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+            <i data-lucide="box" class="w-4 h-4 text-indigo-600"></i>
+            สัดส่วน Type Board
+          </h3>
+          <div id="overviewBoardTypeList" class="space-y-3"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TOPIC 1 -->
+    <div id="content-topic1" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-100 pb-3 mb-5">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs">1</span>
+            สรุปยอดขาย ในประเทศ (Local) vs ต่างประเทศ (Export)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">การเปรียบเทียบสัดส่วนและแนวโน้มการเติบโตระหว่างตลาดในประเทศและส่งออก</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-5 flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl">
+            <div class="h-64 w-full">
+              <canvas id="chartTopic1Donut"></canvas>
+            </div>
+            <div class="grid grid-cols-2 gap-4 w-full mt-4 text-center">
+              <div class="p-3 bg-white rounded-lg border border-slate-200">
+                <span class="text-xs text-slate-500">ในประเทศ (Local)</span>
+                <p id="t1LocalTotal" class="text-base font-bold text-emerald-600 mt-1">-</p>
+                <span id="t1LocalPct" class="text-[11px] text-slate-400">-%</span>
+              </div>
+              <div class="p-3 bg-white rounded-lg border border-slate-200">
+                <span class="text-xs text-slate-500">ต่างประเทศ (Export)</span>
+                <p id="t1ExportTotal" class="text-base font-bold text-indigo-600 mt-1">-</p>
+                <span id="t1ExportPct" class="text-[11px] text-slate-400">-%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">ยอดขายรายเดือนแยกตามตลาด</h4>
+            <div class="h-72">
+              <canvas id="chartTopic1Monthly"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">ตารางสรุปเปรียบเทียบรายปี</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left text-slate-600 border border-slate-200 rounded-lg">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-semibold">
+                <tr>
+                  <th class="py-2.5 px-4">ปี (Year)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดขายในประเทศ (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดขายต่างประเทศ (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดรวม (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วนในประเทศ %</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วนต่างประเทศ %</th>
+                </tr>
+              </thead>
+              <tbody id="tableTopic1Body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TOPIC 2 -->
+    <div id="content-topic2" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-100 pb-3 mb-5">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs">2</span>
+            สรุปยอดขาย รายลูกค้า (Sales by Customer)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">การจัดอันดับลูกค้าหลัก ยอดขายสะสม และสัดส่วนตลาด</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Top 15 ลูกค้ายอดขายสูงสุด</h4>
+            <div class="h-96">
+              <canvas id="chartTopic2Customers"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-5">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">สัดส่วนยอดขายลูกค้ารายใหญ่</h4>
+            <div class="h-96 flex items-center justify-center">
+              <canvas id="chartTopic2Pie"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">ตารางสรุปยอดขายทุกลูกค้า (จัดอันดับ)</h4>
+            <input type="text" id="customerSearchInput" onkeyup="filterCustomerTable()" placeholder="ค้นหาชื่อลูกค้า..." class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 w-64 focus:border-sky-500">
+          </div>
+          <div class="overflow-x-auto max-h-96 custom-scrollbar border border-slate-200 rounded-lg">
+            <table class="w-full text-xs text-left text-slate-600" id="customerTable">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-semibold sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-4">อันดับ</th>
+                  <th class="py-2.5 px-4">ชื่อลูกค้า (Payer Name)</th>
+                  <th class="py-2.5 px-4 text-center">ประเภทตลาด</th>
+                  <th class="py-2.5 px-4 text-right">ยอดรวม (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วน %</th>
+                  <th class="py-2.5 px-4 text-right">ขนาด 8mm (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">ขนาด 12mm (ตร.ม.)</th>
+                </tr>
+              </thead>
+              <tbody id="tableTopic2Body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: TOPIC 3 -->
+    <div id="content-topic3" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-100 pb-3 mb-5">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs">3</span>
+            สรุปยอดขายแยกตาม Code สี (Sales by Color Code)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">การวิเคราะห์ความนิยมของลวดลายและรหัสสีของไม้พื้น</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-8">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Top 15 รหัสสีขายดีที่สุด</h4>
+            <div class="h-96">
+              <canvas id="chartTopic3Colors"></canvas>
+            </div>
+          </div>
+          <div class="lg:col-span-4 bg-slate-50 p-4 rounded-xl flex flex-col justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">ภาพรวมรหัสสี</h4>
+              <div class="space-y-3">
+                <div class="p-3 bg-white rounded-lg border border-slate-200">
+                  <span class="text-xs text-slate-500">จำนวนรหัสสีทั้งหมดที่มีการสั่งซื้อ</span>
+                  <p id="t3TotalColorCodes" class="text-xl font-bold text-slate-800 mt-1">-</p>
+                </div>
+                <div class="p-3 bg-white rounded-lg border border-slate-200">
+                  <span class="text-xs text-slate-500">รหัสสีอันดับ 1 ยอดสั่งซื้อสูงสุด</span>
+                  <p id="t3TopColorCodeName" class="text-base font-bold text-rose-600 mt-1">-</p>
+                  <span id="t3TopColorCodeVol" class="text-xs text-slate-500">- ตร.ม.</span>
+                </div>
+                <div class="p-3 bg-white rounded-lg border border-slate-200">
+                  <span class="text-xs text-slate-500">สัดส่วน Top 5 รหัสสีต่อยอดขายรวม</span>
+                  <p id="t3Top5Share" class="text-base font-bold text-sky-600 mt-1">-%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">ตารางสรุปยอดขายรหัสสีทั้งหมด</h4>
+            <input type="text" id="colorSearchInput" onkeyup="filterColorTable()" placeholder="ค้นหารหัสสี (เช่น MD10743)..." class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 w-64 focus:border-sky-500">
+          </div>
+          <div class="overflow-x-auto max-h-96 custom-scrollbar border border-slate-200 rounded-lg">
+            <table class="w-full text-xs text-left text-slate-600" id="colorTable">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-semibold sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-4">อันดับ</th>
+                  <th class="py-2.5 px-4">รหัสสี (Color Code)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดรวม (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วน %</th>
+                  <th class="py-2.5 px-4 text-right">ยอดในประเทศ (Local)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดส่งออก (Export)</th>
+                </tr>
+              </thead>
+              <tbody id="tableTopic3Body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: TOPIC 4 -->
+    <div id="content-topic4" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-100 pb-3 mb-5">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs">4</span>
+            สรุปยอดขาย ขนาดความหนา (Sales by Thickness)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">การเปรียบเทียบสัดส่วนระหว่างขนาด 8 มม. และ 12 มม.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-5 flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl">
+            <div class="h-64 w-full">
+              <canvas id="chartTopic4Donut"></canvas>
+            </div>
+            <div class="grid grid-cols-2 gap-4 w-full mt-4 text-center">
+              <div class="p-3 bg-white rounded-lg border border-slate-200">
+                <span class="text-xs text-slate-500 font-medium">ความหนา 8 มม. (8 mm)</span>
+                <p id="t4_8mmTotal" class="text-base font-bold text-sky-600 mt-1">-</p>
+                <span id="t4_8mmPct" class="text-[11px] text-slate-400">-%</span>
+              </div>
+              <div class="p-3 bg-white rounded-lg border border-slate-200">
+                <span class="text-xs text-slate-500 font-medium">ความหนา 12 มม. (12 mm)</span>
+                <p id="t4_12mmTotal" class="text-base font-bold text-amber-600 mt-1">-</p>
+                <span id="t4_12mmPct" class="text-[11px] text-slate-400">-%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">แนวโน้มยอดขายแต่ละความหนารายเดือน</h4>
+            <div class="h-72">
+              <canvas id="chartTopic4Monthly"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">สรุปขนาดความหนาแยกตาม Type Board</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left text-slate-600 border border-slate-200 rounded-lg">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-semibold">
+                <tr>
+                  <th class="py-2.5 px-4">Type Board</th>
+                  <th class="py-2.5 px-4 text-right">ความหนา 8 มม. (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">ความหนา 12 มม. (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดรวม (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วน 8mm %</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วน 12mm %</th>
+                </tr>
+              </thead>
+              <tbody id="tableTopic4Body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: TOPIC 5 -->
+    <div id="content-topic5" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="border-b border-slate-100 pb-3 mb-5">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs">5</span>
+            สรุปยอดขาย Type Board (Sales by Board Type)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">การวิเคราะห์ยอดขายตามชนิดของแผ่นไม้ (E2 STD, Hybrid HMR, Hybrid Ultra ฯลฯ)</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-5 flex flex-col items-center justify-center p-4 bg-slate-50 rounded-xl">
+            <div class="h-64 w-full">
+              <canvas id="chartTopic5Donut"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">เปรียบเทียบยอดขายแต่ละ Type Board</h4>
+            <div class="h-72">
+              <canvas id="chartTopic5Bar"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">ตารางสรุปรายละเอียด Type Board</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left text-slate-600 border border-slate-200 rounded-lg">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-semibold">
+                <tr>
+                  <th class="py-2.5 px-4">Type Board</th>
+                  <th class="py-2.5 px-4 text-right">ยอดในประเทศ (Local)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดส่งออก (Export)</th>
+                  <th class="py-2.5 px-4 text-right">ยอดรวม (ตร.ม.)</th>
+                  <th class="py-2.5 px-4 text-right">สัดส่วน %</th>
+                  <th class="py-2.5 px-4 text-center">Overlay หลัก</th>
+                </tr>
+              </thead>
+              <tbody id="tableTopic5Body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: DATA EXPLORER -->
+    <div id="content-table" class="tab-content hidden space-y-4">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">ตารางสำรวจข้อมูลดิบ (Raw Data Records)</h3>
+            <p class="text-xs text-slate-500">แสดงรายการตามตัวกรองที่เลือกไว้ทั้งหมด</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="rawTableSearch" onkeyup="filterRawTable()" placeholder="ค้นหาข้อมูลในตาราง..." class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 w-60 focus:border-sky-500">
+            <span id="rawRecordCount" class="text-xs text-slate-500 font-medium">0 รายการ</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-[500px] custom-scrollbar border border-slate-200 rounded-lg">
+          <table class="w-full text-xs text-left text-slate-600" id="rawDataTable">
+            <thead class="bg-slate-100 text-slate-700 uppercase font-semibold sticky top-0">
+              <tr>
+                <th class="py-2.5 px-3">#</th>
+                <th class="py-2.5 px-3">ปี (Year)</th>
+                <th class="py-2.5 px-3">เดือน (Month)</th>
+                <th class="py-2.5 px-3">ตลาด (Lo/Ex)</th>
+                <th class="py-2.5 px-3">ลูกค้า (Payer Name)</th>
+                <th class="py-2.5 px-3 text-center">ความหนา</th>
+                <th class="py-2.5 px-3">Type Board</th>
+                <th class="py-2.5 px-3">Overlay</th>
+                <th class="py-2.5 px-3">Color Code</th>
+                <th class="py-2.5 px-3 text-right">Sum of m²</th>
+              </tr>
+            </thead>
+            <tbody id="rawTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-12 bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4">
+      <p>© 2026 Flooring Sales Analytics Dashboard • พัฒนาระบบสรุปยอดขายเชิงโต้ตอบสำหรับฝ่ายบริหารและการขาย</p>
+    </div>
+  </footer>
+
+  <!-- App JavaScript Logic -->
+  <script>
+    // Google Sheets Published CSV URL
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2YiIflNmhO84CSad8fueu9QFE1wc7-CoCwGA1gyTG4f2_jIWGqqeeQ4Hd56ggcMehr6UeA0Yi8meR/pub?gid=1655325939&single=true&output=csv";
+
+    // State management
+    let rawSalesData = [];
+    let filteredData = [];
+    let charts = {};
+    let currentTab = 'overview';
+
+    const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    // Initialize lucide icons
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      loadData();
+    });
+
+    // Database Configuration for Persistent Storage
+    const DB_NAME = 'FlooringSalesAppDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'datasets';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          return reject(new Error('IndexedDB not supported'));
+        }
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveDatasetToStorage(data, filename) {
+      const record = {
+        id: 'active_dataset',
+        filename: filename || 'Google Sheet',
+        updatedAt: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
+        data: data
+      };
+
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(record);
+        await new Promise((res, rej) => {
+          tx.oncomplete = res;
+          tx.onerror = rej;
+        });
+      } catch (e) {
+        console.warn('IndexedDB write failed, falling back to localStorage:', e);
+        try {
+          localStorage.setItem('flooring_active_dataset', JSON.stringify(record));
+        } catch(err) {
+          console.error('Storage write failed:', err);
+        }
+      }
+      updateDataSourceBadge(record.filename, record.updatedAt);
+    }
+
+    async function getDatasetFromStorage() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get('active_dataset');
+        const record = await new Promise((res) => {
+          req.onsuccess = () => res(req.result || null);
+          req.onerror = () => res(null);
+        });
+        if (record && record.data && record.data.length > 0) {
+          return record;
+        }
+      } catch (e) {
+        console.warn('IndexedDB read failed, trying localStorage:', e);
+      }
+
+      try {
+        const item = localStorage.getItem('flooring_active_dataset');
+        return item ? JSON.parse(item) : null;
+      } catch(err) {
+        return null;
+      }
+    }
+
+    async function clearStoredData() {
+      if (!confirm('คุณต้องการล้างข้อมูลที่บันทึกไว้ในแคช และโหลดข้อมูลใหม่จาก Google Sheets หรือไม่?')) return;
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete('active_dataset');
+      } catch (e) {}
+      try { localStorage.removeItem('flooring_active_dataset'); } catch(e) {}
+      
+      rawSalesData = [];
+      filteredData = [];
+      document.getElementById('dataSourceBadge').classList.add('hidden');
+      document.getElementById('filteredCountBadge').innerText = "กำลังรีโหลดข้อมูล...";
+      fetchFromGoogleSheet(true);
+    }
+
+    function updateDataSourceBadge(filename, timestamp) {
+      const badge = document.getElementById('dataSourceBadge');
+      const text = document.getElementById('dataSourceText');
+      if (badge && text) {
+        badge.classList.remove('hidden');
+        badge.classList.add('flex');
+        text.innerText = `${filename} (${timestamp || 'บันทึกแล้ว'})`;
+      }
+    }
+
+    // Load CSV Data with persistent caching & Google Sheet default
+    async function loadData(forceFresh = false) {
+      if (!forceFresh) {
+        const stored = await getDatasetFromStorage();
+        if (stored && stored.data && stored.data.length > 0) {
+          rawSalesData = stored.data;
+          updateDataSourceBadge(stored.filename, stored.updatedAt);
+          initDropdowns();
+          applyFilters();
+          return;
+        }
+      }
+
+      await fetchFromGoogleSheet(false);
+    }
+
+    // Fetch live data directly from Google Sheets
+    async function fetchFromGoogleSheet(isManualTrigger = false) {
+      document.getElementById('filteredCountBadge').innerText = "กำลังเชื่อมต่อและดึงข้อมูลจาก Google Sheets...";
+
+      const parseCSVString = (csvString, filename) => {
+        Papa.parse(csvString, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            if (results.data && results.data.length > 0) {
+              const validRows = results.data.filter(row => row['Years (Billing Date)'] && row['Sum of m2'] !== undefined);
+              if (validRows.length > 0) {
+                rawSalesData = validRows;
+                await saveDatasetToStorage(rawSalesData, filename);
+                initDropdowns();
+                applyFilters();
+                if (isManualTrigger) {
+                  alert(`✅ อัปเดตข้อมูลจาก Google Sheets สำเร็จ (${rawSalesData.length.toLocaleString()} รายการ)`);
+                }
+                return;
+              }
+            }
+            alert("⚠️ ไม่พบข้อมูลที่ถูกต้องจาก Google Sheets");
+          },
+          error: function(err) {
+            alert("เกิดข้อผิดพลาดในการประมวลผลข้อมูล: " + err.message);
+          }
+        });
+      };
+
+      try {
+        const response = await fetch(GOOGLE_SHEET_CSV_URL);
+        if (response.ok) {
+          const csvText = await response.text();
+          parseCSVString(csvText, "Google Sheet (ดึงสด)");
+          return;
+        }
+      } catch (err) {
+        console.warn("Direct fetch blocked, trying CORS Proxies...", err);
+      }
+
+      const proxyList = [
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://thingproxy.freeboard.io/fetch/${url}`
+      ];
+
+      for (let i = 0; i < proxyList.length; i++) {
+        try {
+          const proxyUrl = proxyList[i](GOOGLE_SHEET_CSV_URL);
+          const response = await fetch(proxyUrl);
+          if (response.ok) {
+            const csvText = await response.text();
+            if (csvText && csvText.trim().length > 0) {
+              parseCSVString(csvText, `Google Sheet (ผ่าน Proxy #${i+1})`);
+              return;
+            }
+          }
+        } catch (proxyErr) {
+          console.warn(`Proxy #${i+1} failed:`, proxyErr);
+        }
+      }
+
+      try {
+        const jsonpUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(GOOGLE_SHEET_CSV_URL)}&callback=handleGoogleSheetJSONP`;
+        
+        window.handleGoogleSheetJSONP = function(response) {
+          if (response && response.contents) {
+            parseCSVString(response.contents, "Google Sheet (ผ่าน JSONP Bypass)");
+          } else {
+            throw new Error("JSONP response empty");
+          }
+          const scriptTag = document.getElementById('jsonp-cors-script');
+          if (scriptTag) scriptTag.remove();
+          delete window.handleGoogleSheetJSONP;
+        };
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-cors-script';
+        script.src = jsonpUrl;
+        script.onerror = function() {
+          throw new Error("JSONP Script Load Error");
+        };
+        document.body.appendChild(script);
+        return;
+      } catch (jsonpErr) {
+        console.error("JSONP fetch failed:", jsonpErr);
+      }
+
+      document.getElementById('filteredCountBadge').innerText = "ดึงข้อมูลล้มเหลว กรุณาใช้อัปโหลด CSV แทน";
+      alert("❌ ไม่สามารถดึงข้อมูลอัตโนมัติได้\nกรุณาใช้ปุ่ม 'อัปโหลด CSV' เพื่อเลือกไฟล์ด้วยตนเอง");
+    }
+
+    async function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      document.getElementById('filteredCountBadge').innerText = "กำลังประมวลผลไฟล์...";
+
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: async function(results) {
+          const validRows = results.data.filter(row => row['Years (Billing Date)'] && row['Sum of m2'] !== undefined);
+          if (validRows.length === 0) {
+            alert('ไม่พบแถวข้อมูลที่ถูกต้องในไฟล์ CSV นี้');
+            return;
+          }
+          rawSalesData = validRows;
+          await saveDatasetToStorage(rawSalesData, file.name);
+          initDropdowns();
+          applyFilters();
+          alert(`✅ อัปโหลดและบันทึกข้อมูลเรียบร้อยแล้ว (${rawSalesData.length.toLocaleString()} แถว)`);
+        },
+        error: function(err) {
+          alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ' + err.message);
+        }
+      });
+    }
+
+    function initDropdowns() {
+      const types = [...new Set(rawSalesData.map(r => r.Type2).filter(Boolean))].sort();
+      const typeSelect = document.getElementById('filterType');
+      typeSelect.innerHTML = '<option value="ALL">ทุกประเภท (All Types)</option>';
+      types.forEach(t => {
+        typeSelect.innerHTML += `<option value="${t}">${t}</option>`;
+      });
+
+      const customers = [...new Set(rawSalesData.map(r => r['Payer Name2']).filter(Boolean))].sort();
+      const custSelect = document.getElementById('filterCustomer');
+      custSelect.innerHTML = '<option value="ALL">ทุกลูกค้า (All Customers)</option>';
+      customers.forEach(c => {
+        custSelect.innerHTML += `<option value="${c}">${c}</option>`;
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('filterYear').value = "ALL";
+      document.getElementById('filterMonth').value = "ALL";
+      document.getElementById('filterMarket').value = "ALL";
+      document.getElementById('filterType').value = "ALL";
+      document.getElementById('filterThickness').value = "ALL";
+      document.getElementById('filterCustomer').value = "ALL";
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const year = document.getElementById('filterYear').value;
+      const month = document.getElementById('filterMonth').value;
+      const market = document.getElementById('filterMarket').value;
+      const type = document.getElementById('filterType').value;
+      const thickness = document.getElementById('filterThickness').value;
+      const customer = document.getElementById('filterCustomer').value;
+
+      filteredData = rawSalesData.filter(row => {
+        if (year !== "ALL" && String(row['Years (Billing Date)']) !== year) return false;
+        if (month !== "ALL" && String(row['Months (Billing Date)']) !== month) return false;
+        if (market !== "ALL" && String(row['Lo/Ex']) !== market) return false;
+        if (type !== "ALL" && String(row.Type2) !== type) return false;
+        if (thickness !== "ALL" && String(row['Thickness (mm)']) !== thickness) return false;
+        if (customer !== "ALL" && String(row['Payer Name2']) !== customer) return false;
+        return true;
+      });
+
+      document.getElementById('filteredCountBadge').innerText = `พบ ${filteredData.length.toLocaleString()} รายการ`;
+      
+      updateKPIs();
+      renderActiveTabContent();
+    }
+
+    function renderActiveTabContent() {
+      if (currentTab === 'overview') renderOverviewTab();
+      else if (currentTab === 'topic1') renderTopic1();
+      else if (currentTab === 'topic2') renderTopic2();
+      else if (currentTab === 'topic3') renderTopic3();
+      else if (currentTab === 'topic4') renderTopic4();
+      else if (currentTab === 'topic5') renderTopic5();
+      else if (currentTab === 'table') renderRawTable();
+    }
+
+    function formatNumber(num) {
+      return (Number(num) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    }
+    function formatInt(num) {
+      return (Number(num) || 0).toLocaleString('en-US');
+    }
+
+    function updateKPIs() {
+      const totalSales = filteredData.reduce((acc, r) => acc + (Number(r['Sum of m2']) || 0), 0);
+      const localSales = filteredData.filter(r => r['Lo/Ex'] === 'Local').reduce((acc, r) => acc + (Number(r['Sum of m2']) || 0), 0);
+      const exportSales = filteredData.filter(r => r['Lo/Ex'] === 'Export').reduce((acc, r) => acc + (Number(r['Sum of m2']) || 0), 0);
+
+      document.getElementById('kpiTotalSales').innerText = formatNumber(totalSales);
+      document.getElementById('kpiLocalSales').innerText = formatNumber(localSales);
+      document.getElementById('kpiExportSales').innerText = formatNumber(exportSales);
+
+      const localPct = totalSales > 0 ? ((localSales / totalSales) * 100).toFixed(1) : 0;
+      const exportPct = totalSales > 0 ? ((exportSales / totalSales) * 100).toFixed(1) : 0;
+      document.getElementById('kpiLocalRatio').innerText = `สัดส่วน: ${localPct}%`;
+      document.getElementById('kpiExportRatio').innerText = `สัดส่วน: ${exportPct}%`;
+
+      const custMap = {};
+      filteredData.forEach(r => {
+        const c = r['Payer Name2'] || 'Unknown';
+        custMap[c] = (custMap[c] || 0) + (Number(r['Sum of m2']) || 0);
+      });
+      const topCust = Object.entries(custMap).sort((a,b) => b[1] - a[1])[0] || ['-', 0];
+      document.getElementById('kpiTopCustomer').innerText = topCust[0];
+      document.getElementById('kpiTopCustomerVol').innerText = `ยอด: ${formatNumber(topCust[1])} ตร.ม.`;
+
+      const colorMap = {};
+      filteredData.forEach(r => {
+        const c = r['Color Code'] || 'Unknown';
+        colorMap[c] = (colorMap[c] || 0) + (Number(r['Sum of m2']) || 0);
+      });
+      const topColor = Object.entries(colorMap).sort((a,b) => b[1] - a[1])[0] || ['-', 0];
+      document.getElementById('kpiTopColor').innerText = topColor[0];
+      document.getElementById('kpiTopColorVol').innerText = `ยอด: ${formatNumber(topColor[1])} ตร.ม.`;
+    }
+
+    // Tab Switching (แก้ไขเพื่อให้ Render กราฟอย่างถูกต้องเมื่อเปิดแท็บ)
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-sky-600', 'text-sky-600', 'bg-sky-50/50');
+        btn.classList.add('border-transparent', 'text-slate-600');
+      });
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('border-sky-600', 'text-sky-600', 'bg-sky-50/50');
+        activeBtn.classList.remove('border-transparent', 'text-slate-600');
+      }
+      const activeContent = document.getElementById(`content-${tabId}`);
+      if (activeContent) {
+        activeContent.classList.remove('hidden');
+      }
+
+      // แสดงผลเนื้อหาและ Render กราฟใหม่ตามแท็บที่เปิด
+      renderActiveTabContent();
+    }
+
+    // TAB: OVERVIEW
+    function renderOverviewTab() {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const localMonthly = new Array(12).fill(0);
+      const exportMonthly = new Array(12).fill(0);
+
+      filteredData.forEach(r => {
+        const mIdx = months.indexOf(r['Months (Billing Date)']);
+        if (mIdx !== -1) {
+          const val = Number(r['Sum of m2']) || 0;
+          if (r['Lo/Ex'] === 'Local') localMonthly[mIdx] += val;
+          else if (r['Lo/Ex'] === 'Export') exportMonthly[mIdx] += val;
+        }
+      });
+
+      if (charts.monthlyTrend) charts.monthlyTrend.destroy();
+      const ctxTrend = document.getElementById('chartMonthlyTrend').getContext('2d');
+      charts.monthlyTrend = new Chart(ctxTrend, {
+        type: 'bar',
+        data: {
+          labels: months,
+          datasets: [
+            {
+              label: 'ในประเทศ (Local)',
+              data: localMonthly,
+              backgroundColor: '#10b981',
+              borderRadius: 6,
+            },
+            {
+              label: 'ต่างประเทศ (Export)',
+              data: exportMonthly,
+              backgroundColor: '#6366f1',
+              borderRadius: 6,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { family: 'Prompt', size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${formatNumber(ctx.raw)} ตร.ม.`
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } }
+          }
+        }
+      });
+
+      const totalLocal = localMonthly.reduce((a, b) => a + b, 0);
+      const totalExport = exportMonthly.reduce((a, b) => a + b, 0);
+      if (charts.marketMini) charts.marketMini.destroy();
+      const ctxM = document.getElementById('chartMarketShareMini').getContext('2d');
+      charts.marketMini = new Chart(ctxM, {
+        type: 'doughnut',
+        data: {
+          labels: ['ในประเทศ', 'ต่างประเทศ'],
+          datasets: [{
+            data: [totalLocal, totalExport],
+            backgroundColor: ['#10b981', '#6366f1'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Prompt', size: 10 } } }
+          }
+        }
+      });
+
+      const thickMap = { '8': 0, '12': 0 };
+      filteredData.forEach(r => {
+        const th = String(r['Thickness (mm)']);
+        if (thickMap[th] !== undefined) thickMap[th] += (Number(r['Sum of m2']) || 0);
+      });
+      if (charts.thickMini) charts.thickMini.destroy();
+      const ctxT = document.getElementById('chartThicknessMini').getContext('2d');
+      charts.thickMini = new Chart(ctxT, {
+        type: 'doughnut',
+        data: {
+          labels: ['8 มม.', '12 มม.'],
+          datasets: [{
+            data: [thickMap['8'], thickMap['12']],
+            backgroundColor: ['#0284c7', '#f59e0b'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Prompt', size: 10 } } }
+          }
+        }
+      });
+
+      const custMap = {};
+      filteredData.forEach(r => {
+        const c = r['Payer Name2'] || 'Unknown';
+        custMap[c] = (custMap[c] || 0) + (Number(r['Sum of m2']) || 0);
+      });
+      const top5Cust = Object.entries(custMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+      const totalS = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
+      
+      const custContainer = document.getElementById('overviewTopCustomersList');
+      custContainer.innerHTML = top5Cust.map(([name, vol], idx) => {
+        const pct = ((vol / totalS) * 100).toFixed(1);
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-medium text-slate-700 truncate">${idx+1}. ${name}</span>
+              <span class="font-bold text-slate-900">${formatNumber(vol)} m² (${pct}%)</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5">
+              <div class="bg-sky-600 h-1.5 rounded-full" style="width: ${Math.min(pct * 2, 100)}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const colorMap = {};
+      filteredData.forEach(r => {
+        const c = r['Color Code'] || 'Unknown';
+        colorMap[c] = (colorMap[c] || 0) + (Number(r['Sum of m2']) || 0);
+      });
+      const top5Colors = Object.entries(colorMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+      const colorContainer = document.getElementById('overviewTopColorsList');
+      colorContainer.innerHTML = top5Colors.map(([name, vol], idx) => {
+        const pct = ((vol / totalS) * 100).toFixed(1);
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-medium text-slate-700">${idx+1}. ${name}</span>
+              <span class="font-bold text-slate-900">${formatNumber(vol)} m² (${pct}%)</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5">
+              <div class="bg-rose-500 h-1.5 rounded-full" style="width: ${Math.min(pct * 2, 100)}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const typeMap = {};
+      filteredData.forEach(r => {
+        const t = r.Type2 || 'Other';
+        typeMap[t] = (typeMap[t] || 0) + (Number(r['Sum of m2']) || 0);
+      });
+      const typeList = Object.entries(typeMap).sort((a,b) => b[1] - a[1]);
+      const typeContainer = document.getElementById('overviewBoardTypeList');
+      typeContainer.innerHTML = typeList.map(([name, vol]) => {
+        const pct = ((vol / totalS) * 100).toFixed(1);
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-medium text-slate-700">${name}</span>
+              <span class="font-bold text-slate-900">${formatNumber(vol)} m² (${pct}%)</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5">
+              <div class="bg-indigo-600 h-1.5 rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // TOPIC 1: Local vs Export
+    function renderTopic1() {
+      const localSum = filteredData.filter(r => r['Lo/Ex'] === 'Local').reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0);
+      const exportSum = filteredData.filter(r => r['Lo/Ex'] === 'Export').reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0);
+      const total = localSum + exportSum || 1;
+
+      document.getElementById('t1LocalTotal').innerText = `${formatNumber(localSum)} ตร.ม.`;
+      document.getElementById('t1LocalPct').innerText = `สัดส่วน ${((localSum/total)*100).toFixed(1)}%`;
+      document.getElementById('t1ExportTotal').innerText = `${formatNumber(exportSum)} ตร.ม.`;
+      document.getElementById('t1ExportPct').innerText = `สัดส่วน ${((exportSum/total)*100).toFixed(1)}%`;
+
+      if (charts.topic1Donut) charts.topic1Donut.destroy();
+      const ctxD = document.getElementById('chartTopic1Donut').getContext('2d');
+      charts.topic1Donut = new Chart(ctxD, {
+        type: 'doughnut',
+        data: {
+          labels: ['ในประเทศ (Local)', 'ต่างประเทศ (Export)'],
+          datasets: [{
+            data: [localSum, exportSum],
+            backgroundColor: ['#10b981', '#6366f1'],
+            borderWidth: 3,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 12 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${formatNumber(ctx.raw)} ตร.ม. (${((ctx.raw/total)*100).toFixed(1)}%)`
+              }
+            }
+          }
+        }
+      });
+
+      const localMonthly = new Array(12).fill(0);
+      const exportMonthly = new Array(12).fill(0);
+      filteredData.forEach(r => {
+        const mIdx = monthOrder.indexOf(r['Months (Billing Date)']);
+        if (mIdx !== -1) {
+          const val = Number(r['Sum of m2']) || 0;
+          if (r['Lo/Ex'] === 'Local') localMonthly[mIdx] += val;
+          else if (r['Lo/Ex'] === 'Export') exportMonthly[mIdx] += val;
+        }
+      });
+
+      if (charts.topic1Monthly) charts.topic1Monthly.destroy();
+      const ctxM = document.getElementById('chartTopic1Monthly').getContext('2d');
+      charts.topic1Monthly = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: monthOrder,
+          datasets: [
+            {
+              label: 'ในประเทศ (Local)',
+              data: localMonthly,
+              backgroundColor: '#10b981',
+              borderRadius: 6
+            },
+            {
+              label: 'ต่างประเทศ (Export)',
+              data: exportMonthly,
+              backgroundColor: '#6366f1',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { family: 'Prompt', size: 11 } } }
+          },
+          scales: {
+            x: { stacked: false, grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } }
+          }
+        }
+      });
+
+      const yearMap = {};
+      filteredData.forEach(r => {
+        const yr = r['Years (Billing Date)'] || 'Unknown';
+        if (!yearMap[yr]) yearMap[yr] = { local: 0, export: 0, total: 0 };
+        const val = Number(r['Sum of m2']) || 0;
+        if (r['Lo/Ex'] === 'Local') yearMap[yr].local += val;
+        else if (r['Lo/Ex'] === 'Export') yearMap[yr].export += val;
+        yearMap[yr].total += val;
+      });
+
+      const tbody = document.getElementById('tableTopic1Body');
+      tbody.innerHTML = Object.entries(yearMap).sort().map(([yr, stats]) => {
+        const locPct = stats.total > 0 ? ((stats.local / stats.total) * 100).toFixed(1) : '0.0';
+        const expPct = stats.total > 0 ? ((stats.export / stats.total) * 100).toFixed(1) : '0.0';
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-800">${yr}</td>
+            <td class="py-3 px-4 text-right font-medium text-emerald-600">${formatNumber(stats.local)}</td>
+            <td class="py-3 px-4 text-right font-medium text-indigo-600">${formatNumber(stats.export)}</td>
+            <td class="py-3 px-4 text-right font-bold text-slate-900">${formatNumber(stats.total)}</td>
+            <td class="py-3 px-4 text-right">${locPct}%</td>
+            <td class="py-3 px-4 text-right">${expPct}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // TOPIC 2: Sales by Customer
+    function renderTopic2() {
+      const custMap = {};
+      filteredData.forEach(r => {
+        const c = r['Payer Name2'] || 'Unknown';
+        if (!custMap[c]) {
+          custMap[c] = { total: 0, local: 0, export: 0, th8: 0, th12: 0, market: r['Lo/Ex'] };
+        }
+        const val = Number(r['Sum of m2']) || 0;
+        custMap[c].total += val;
+        if (r['Lo/Ex'] === 'Local') custMap[c].local += val;
+        if (r['Lo/Ex'] === 'Export') custMap[c].export += val;
+        if (String(r['Thickness (mm)']) === '8') custMap[c].th8 += val;
+        if (String(r['Thickness (mm)']) === '12') custMap[c].th12 += val;
+      });
+
+      const sortedCust = Object.entries(custMap).sort((a, b) => b[1].total - a[1].total);
+      const top15 = sortedCust.slice(0, 15);
+      const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
+
+      if (charts.topic2Bar) charts.topic2Bar.destroy();
+      const ctxB = document.getElementById('chartTopic2Customers').getContext('2d');
+      charts.topic2Bar = new Chart(ctxB, {
+        type: 'bar',
+        data: {
+          labels: top15.map(c => c[0]),
+          datasets: [{
+            label: 'ยอดขาย (ตร.ม.)',
+            data: top15.map(c => c[1].total),
+            backgroundColor: '#0284c7',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `ยอดขาย: ${formatNumber(ctx.raw)} ตร.ม. (${((ctx.raw/totalAll)*100).toFixed(1)}%)`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+
+      const top5Cust = sortedCust.slice(0, 5);
+      const otherCustTotal = sortedCust.slice(5).reduce((a, c) => a + c[1].total, 0);
+      const pieLabels = top5Cust.map(c => c[0]);
+      const pieData = top5Cust.map(c => c[1].total);
+      if (otherCustTotal > 0) {
+        pieLabels.push('อื่นๆ (Others)');
+        pieData.push(otherCustTotal);
+      }
+
+      if (charts.topic2Pie) charts.topic2Pie.destroy();
+      const ctxP = document.getElementById('chartTopic2Pie').getContext('2d');
+      charts.topic2Pie = new Chart(ctxP, {
+        type: 'pie',
+        data: {
+          labels: pieLabels,
+          datasets: [{
+            data: pieData,
+            backgroundColor: ['#0284c7', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#cbd5e1'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Prompt', size: 10 } } }
+          }
+        }
+      });
+
+      const tbody = document.getElementById('tableTopic2Body');
+      tbody.innerHTML = sortedCust.map(([name, s], idx) => {
+        const pct = ((s.total / totalAll) * 100).toFixed(1);
+        const marketBadge = s.export > 0 && s.local > 0 
+          ? '<span class="px-2 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 font-semibold">Local + Export</span>'
+          : s.export > 0 
+            ? '<span class="px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 font-semibold">Export</span>'
+            : '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 font-semibold">Local</span>';
+
+        return `
+          <tr class="hover:bg-slate-50 transition customer-row">
+            <td class="py-2.5 px-4 font-bold text-slate-400">${idx+1}</td>
+            <td class="py-2.5 px-4 font-semibold text-slate-800 cust-name">${name}</td>
+            <td class="py-2.5 px-4 text-center">${marketBadge}</td>
+            <td class="py-2.5 px-4 text-right font-bold text-slate-900">${formatNumber(s.total)}</td>
+            <td class="py-2.5 px-4 text-right font-medium text-sky-600">${pct}%</td>
+            <td class="py-2.5 px-4 text-right text-slate-600">${formatNumber(s.th8)}</td>
+            <td class="py-2.5 px-4 text-right text-slate-600">${formatNumber(s.th12)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterCustomerTable() {
+      const q = document.getElementById('customerSearchInput').value.toLowerCase();
+      document.querySelectorAll('#customerTable tbody tr').forEach(row => {
+        const text = row.querySelector('.cust-name').innerText.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // TOPIC 3: Sales by Color Code
+    function renderTopic3() {
+      const colorMap = {};
+      filteredData.forEach(r => {
+        const c = r['Color Code'] || 'Unknown';
+        if (!colorMap[c]) colorMap[c] = { total: 0, local: 0, export: 0 };
+        const val = Number(r['Sum of m2']) || 0;
+        colorMap[c].total += val;
+        if (r['Lo/Ex'] === 'Local') colorMap[c].local += val;
+        if (r['Lo/Ex'] === 'Export') colorMap[c].export += val;
+      });
+
+      const sortedColors = Object.entries(colorMap).sort((a, b) => b[1].total - a[1].total);
+      const top15Colors = sortedColors.slice(0, 15);
+      const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
+
+      document.getElementById('t3TotalColorCodes').innerText = `${sortedColors.length} รหัสสี`;
+      if (sortedColors.length > 0) {
+        document.getElementById('t3TopColorCodeName').innerText = sortedColors[0][0];
+        document.getElementById('t3TopColorCodeVol').innerText = `${formatNumber(sortedColors[0][1].total)} ตร.ม. (${((sortedColors[0][1].total/totalAll)*100).toFixed(1)}%)`;
+      }
+      const top5Sum = sortedColors.slice(0, 5).reduce((a, c) => a + c[1].total, 0);
+      document.getElementById('t3Top5Share').innerText = `${((top5Sum/totalAll)*100).toFixed(1)}%`;
+
+      if (charts.topic3Bar) charts.topic3Bar.destroy();
+      const ctxC = document.getElementById('chartTopic3Colors').getContext('2d');
+      charts.topic3Bar = new Chart(ctxC, {
+        type: 'bar',
+        data: {
+          labels: top15Colors.map(c => c[0]),
+          datasets: [{
+            label: 'ยอดขาย (ตร.ม.)',
+            data: top15Colors.map(c => c[1].total),
+            backgroundColor: '#f43f5e',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `ยอดขาย: ${formatNumber(ctx.raw)} ตร.ม. (${((ctx.raw/totalAll)*100).toFixed(1)}%)`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } }
+          }
+        }
+      });
+
+      const tbody = document.getElementById('tableTopic3Body');
+      tbody.innerHTML = sortedColors.map(([code, s], idx) => {
+        const pct = ((s.total / totalAll) * 100).toFixed(1);
+        return `
+          <tr class="hover:bg-slate-50 transition color-row">
+            <td class="py-2.5 px-4 font-bold text-slate-400">${idx+1}</td>
+            <td class="py-2.5 px-4 font-bold text-rose-600 color-code">${code}</td>
+            <td class="py-2.5 px-4 text-right font-bold text-slate-900">${formatNumber(s.total)}</td>
+            <td class="py-2.5 px-4 text-right font-medium text-slate-600">${pct}%</td>
+            <td class="py-2.5 px-4 text-right text-emerald-600 font-medium">${formatNumber(s.local)}</td>
+            <td class="py-2.5 px-4 text-right text-indigo-600 font-medium">${formatNumber(s.export)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterColorTable() {
+      const q = document.getElementById('colorSearchInput').value.toLowerCase();
+      document.querySelectorAll('#colorTable tbody tr').forEach(row => {
+        const text = row.querySelector('.color-code').innerText.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // TOPIC 4: Sales by Thickness
+    function renderTopic4() {
+      let sum8 = 0;
+      let sum12 = 0;
+      const m8 = new Array(12).fill(0);
+      const m12 = new Array(12).fill(0);
+
+      filteredData.forEach(r => {
+        const th = String(r['Thickness (mm)']);
+        const val = Number(r['Sum of m2']) || 0;
+        const mIdx = monthOrder.indexOf(r['Months (Billing Date)']);
+
+        if (th === '8') {
+          sum8 += val;
+          if (mIdx !== -1) m8[mIdx] += val;
+        } else if (th === '12') {
+          sum12 += val;
+          if (mIdx !== -1) m12[mIdx] += val;
+        }
+      });
+
+      const total = sum8 + sum12 || 1;
+      document.getElementById('t4_8mmTotal').innerText = `${formatNumber(sum8)} ตร.ม.`;
+      document.getElementById('t4_8mmPct').innerText = `สัดส่วน ${((sum8/total)*100).toFixed(1)}%`;
+      document.getElementById('t4_12mmTotal').innerText = `${formatNumber(sum12)} ตร.ม.`;
+      document.getElementById('t4_12mmPct').innerText = `สัดส่วน ${((sum12/total)*100).toFixed(1)}%`;
+
+      if (charts.topic4Donut) charts.topic4Donut.destroy();
+      const ctxD = document.getElementById('chartTopic4Donut').getContext('2d');
+      charts.topic4Donut = new Chart(ctxD, {
+        type: 'doughnut',
+        data: {
+          labels: ['8 มม. (8 mm)', '12 มม. (12 mm)'],
+          datasets: [{
+            data: [sum8, sum12],
+            backgroundColor: ['#0284c7', '#f59e0b'],
+            borderWidth: 3,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 12 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${formatNumber(ctx.raw)} ตร.ม. (${((ctx.raw/total)*100).toFixed(1)}%)`
+              }
+            }
+          }
+        }
+      });
+
+      if (charts.topic4Monthly) charts.topic4Monthly.destroy();
+      const ctxM = document.getElementById('chartTopic4Monthly').getContext('2d');
+      charts.topic4Monthly = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: monthOrder,
+          datasets: [
+            {
+              label: 'ขนาด 8 มม.',
+              data: m8,
+              backgroundColor: '#0284c7',
+              borderRadius: 6
+            },
+            {
+              label: 'ขนาด 12 มม.',
+              data: m12,
+              backgroundColor: '#f59e0b',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { family: 'Prompt', size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } }
+          }
+        }
+      });
+
+      const typeThickMap = {};
+      filteredData.forEach(r => {
+        const t = r.Type2 || 'Other';
+        if (!typeThickMap[t]) typeThickMap[t] = { th8: 0, th12: 0, total: 0 };
+        const val = Number(r['Sum of m2']) || 0;
+        const th = String(r['Thickness (mm)']);
+        if (th === '8') typeThickMap[t].th8 += val;
+        if (th === '12') typeThickMap[t].th12 += val;
+        typeThickMap[t].total += val;
+      });
+
+      const tbody = document.getElementById('tableTopic4Body');
+      tbody.innerHTML = Object.entries(typeThickMap).sort((a,b) => b[1].total - a[1].total).map(([type, s]) => {
+        const pct8 = s.total > 0 ? ((s.th8 / s.total) * 100).toFixed(1) : '0.0';
+        const pct12 = s.total > 0 ? ((s.th12 / s.total) * 100).toFixed(1) : '0.0';
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-800">${type}</td>
+            <td class="py-3 px-4 text-right font-medium text-sky-600">${formatNumber(s.th8)}</td>
+            <td class="py-3 px-4 text-right font-medium text-amber-600">${formatNumber(s.th12)}</td>
+            <td class="py-3 px-4 text-right font-bold text-slate-900">${formatNumber(s.total)}</td>
+            <td class="py-3 px-4 text-right">${pct8}%</td>
+            <td class="py-3 px-4 text-right">${pct12}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // TOPIC 5: Sales by Board Type
+    function renderTopic5() {
+      const typeMap = {};
+      filteredData.forEach(r => {
+        const t = r.Type2 || 'Other';
+        if (!typeMap[t]) typeMap[t] = { total: 0, local: 0, export: 0, overlays: {} };
+        const val = Number(r['Sum of m2']) || 0;
+        typeMap[t].total += val;
+        if (r['Lo/Ex'] === 'Local') typeMap[t].local += val;
+        if (r['Lo/Ex'] === 'Export') typeMap[t].export += val;
+        
+        const ov = r.overlay || '-';
+        typeMap[t].overlays[ov] = (typeMap[t].overlays[ov] || 0) + val;
+      });
+
+      const sortedTypes = Object.entries(typeMap).sort((a, b) => b[1].total - a[1].total);
+      const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
+
+      if (charts.topic5Donut) charts.topic5Donut.destroy();
+      const ctxD = document.getElementById('chartTopic5Donut').getContext('2d');
+      charts.topic5Donut = new Chart(ctxD, {
+        type: 'doughnut',
+        data: {
+          labels: sortedTypes.map(t => t[0]),
+          datasets: [{
+            data: sortedTypes.map(t => t[1].total),
+            backgroundColor: ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${formatNumber(ctx.raw)} ตร.ม. (${((ctx.raw/totalAll)*100).toFixed(1)}%)`
+              }
+            }
+          }
+        }
+      });
+
+      if (charts.topic5Bar) charts.topic5Bar.destroy();
+      const ctxB = document.getElementById('chartTopic5Bar').getContext('2d');
+      charts.topic5Bar = new Chart(ctxB, {
+        type: 'bar',
+        data: {
+          labels: sortedTypes.map(t => t[0]),
+          datasets: [
+            {
+              label: 'ในประเทศ (Local)',
+              data: sortedTypes.map(t => t[1].local),
+              backgroundColor: '#10b981',
+              borderRadius: 6
+            },
+            {
+              label: 'ต่างประเทศ (Export)',
+              data: sortedTypes.map(t => t[1].export),
+              backgroundColor: '#6366f1',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { family: 'Prompt', size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v/1000) + 'k' } }
+          }
+        }
+      });
+
+      const tbody = document.getElementById('tableTopic5Body');
+      tbody.innerHTML = sortedTypes.map(([typeName, s]) => {
+        const pct = ((s.total / totalAll) * 100).toFixed(1);
+        const topOverlay = Object.entries(s.overlays).sort((a,b) => b[1] - a[1])[0] || ['-', 0];
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-800">${typeName}</td>
+            <td class="py-3 px-4 text-right font-medium text-emerald-600">${formatNumber(s.local)}</td>
+            <td class="py-3 px-4 text-right font-medium text-indigo-600">${formatNumber(s.export)}</td>
+            <td class="py-3 px-4 text-right font-bold text-slate-900">${formatNumber(s.total)}</td>
+            <td class="py-3 px-4 text-right font-semibold text-sky-600">${pct}%</td>
+            <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded text-[11px] bg-slate-100 font-semibold text-slate-700">${topOverlay[0]}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // RAW DATA EXPLORER
+    function renderRawTable() {
+      const tbody = document.getElementById('rawTableBody');
+      document.getElementById('rawRecordCount').innerText = `${filteredData.length.toLocaleString()} รายการ`;
+      
+      const rowsToDisplay = filteredData.slice(0, 300);
+      tbody.innerHTML = rowsToDisplay.map((r, idx) => `
+        <tr class="hover:bg-slate-50 transition raw-row">
+          <td class="py-2 px-3 text-slate-400 font-medium">${idx+1}</td>
+          <td class="py-2 px-3 font-semibold text-slate-700">${r['Years (Billing Date)']}</td>
+          <td class="py-2 px-3 text-slate-600">${r['Months (Billing Date)']}</td>
+          <td class="py-2 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${r['Lo/Ex'] === 'Local' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}">
+              ${r['Lo/Ex']}
+            </span>
+          </td>
+          <td class="py-2 px-3 font-medium text-slate-800">${r['Payer Name2']}</td>
+          <td class="py-2 px-3 text-center font-medium">${r['Thickness (mm)']} mm</td>
+          <td class="py-2 px-3 text-slate-700">${r.Type2}</td>
+          <td class="py-2 px-3 text-slate-600">${r.overlay || '-'}</td>
+          <td class="py-2 px-3 font-mono font-medium text-rose-600">${r['Color Code']}</td>
+          <td class="py-2 px-3 text-right font-bold text-slate-900">${formatNumber(r['Sum of m2'])}</td>
+        </tr>
+      `).join('');
+    }
+
+    function filterRawTable() {
+      const q = document.getElementById('rawTableSearch').value.toLowerCase();
+      document.querySelectorAll('#rawDataTable tbody tr').forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function exportCSV() {
+      if (!filteredData.length) {
+        alert("ไม่มีข้อมูลที่จะส่งออก");
+        return;
+      }
+      const csv = Papa.unparse(filteredData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `flooring_sales_export_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Function ส่งออก PDF
+    function exportPDF() {
+      const element = document.getElementById('dashboardContent');
+      
+      const opt = {
+        margin:       [0.3, 0.3, 0.3, 0.3],
+        filename:     `flooring_sales_report_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    }
+  </script>
+</body>
+</html>
