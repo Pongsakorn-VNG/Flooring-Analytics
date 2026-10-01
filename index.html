@@ -76,11 +76,15 @@
       <div class="flex items-center flex-wrap gap-2">
         <div id="dataSourceBadge" class="hidden items-center gap-1.5 px-3 py-1 rounded-lg text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
           <i data-lucide="database" class="w-3.5 h-3.5 text-emerald-600"></i>
-          <span id="dataSourceText">โหลดข้อมูลจากหน่วยความจำ</span>
+          <span id="dataSourceText">ดึงข้อมูลจาก Google Sheets</span>
         </div>
+        <button onclick="fetchFromGoogleSheet(true)" title="ดึงข้อมูลสดใหม่จาก Google Sheets" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>รีเฟรช Google Sheet</span>
+        </button>
         <label class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 shadow-sm transition">
           <i data-lucide="file-up" class="w-3.5 h-3.5 text-sky-600"></i>
-          <span>อัปโหลด CSV ใหม่</span>
+          <span>อัปโหลด CSV</span>
           <input type="file" id="csvFileInput" accept=".csv" onchange="handleFileUpload(event)" class="hidden" />
         </label>
         <button onclick="clearStoredData()" title="ลบข้อมูลที่บันทึกไว้ในเบราว์เซอร์" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-transparent transition">
@@ -242,7 +246,7 @@
       </div>
     </section>
 
-    <!-- Navigation Tabs for 5 Required Topics -->
+    <!-- Navigation Tabs -->
     <div class="flex border-b border-slate-200 space-x-2 overflow-x-auto custom-scrollbar pb-1">
       <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 border-sky-600 text-sky-600 bg-sky-50/50">
         ภาพรวมทั้งหมด (Overview)
@@ -269,9 +273,7 @@
 
     <!-- TAB 1: OVERVIEW -->
     <div id="content-overview" class="tab-content space-y-6">
-      <!-- Grid 2 Columns -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Monthly Trend Chart -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-4">
             <div>
@@ -285,7 +287,6 @@
           </div>
         </div>
 
-        <!-- Market & Thickness Distribution -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-4">
             <div>
@@ -306,9 +307,7 @@
         </div>
       </div>
 
-      <!-- Quick Summary Cards Grid -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Top 5 Customers Summary -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
             <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
@@ -317,7 +316,6 @@
           <div id="overviewTopCustomersList" class="space-y-3"></div>
         </div>
 
-        <!-- Top 5 Color Codes Summary -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
             <i data-lucide="palette" class="w-4 h-4 text-rose-600"></i>
@@ -326,7 +324,6 @@
           <div id="overviewTopColorsList" class="space-y-3"></div>
         </div>
 
-        <!-- Board Type Summary -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
             <i data-lucide="box" class="w-4 h-4 text-indigo-600"></i>
@@ -337,7 +334,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: TOPIC 1 - ยอดขาย ในประเทศ / ต่างประเทศ -->
+    <!-- TAB 2: TOPIC 1 -->
     <div id="content-topic1" class="tab-content hidden space-y-6">
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-100 pb-3 mb-5">
@@ -375,7 +372,6 @@
           </div>
         </div>
 
-        <!-- Table Breakdown by Year -->
         <div class="mt-6">
           <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">ตารางสรุปเปรียบเทียบรายปี</h4>
           <div class="overflow-x-auto">
@@ -397,7 +393,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: TOPIC 2 - ยอดขาย รายลูกค้า -->
+    <!-- TAB 3: TOPIC 2 -->
     <div id="content-topic2" class="tab-content hidden space-y-6">
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-100 pb-3 mb-5">
@@ -424,7 +420,6 @@
           </div>
         </div>
 
-        <!-- Complete Customer Table -->
         <div class="mt-8">
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">ตารางสรุปยอดขายทุกลูกค้า (จัดอันดับ)</h4>
@@ -450,7 +445,7 @@
       </div>
     </div>
 
-    <!-- TAB 4: TOPIC 3 - ยอดขายแยกตาม Code สี -->
+    <!-- TAB 4: TOPIC 3 -->
     <div id="content-topic3" class="tab-content hidden space-y-6">
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-100 pb-3 mb-5">
@@ -490,7 +485,6 @@
           </div>
         </div>
 
-        <!-- Color Codes Table -->
         <div class="mt-8">
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">ตารางสรุปยอดขายรหัสสีทั้งหมด</h4>
@@ -515,7 +509,7 @@
       </div>
     </div>
 
-    <!-- TAB 5: TOPIC 4 - ยอดขาย ขนาดความหนา -->
+    <!-- TAB 5: TOPIC 4 -->
     <div id="content-topic4" class="tab-content hidden space-y-6">
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-100 pb-3 mb-5">
@@ -553,7 +547,6 @@
           </div>
         </div>
 
-        <!-- Thickness Breakdown by Board Type -->
         <div class="mt-6">
           <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">สรุปขนาดความหนาแยกตาม Type Board</h4>
           <div class="overflow-x-auto">
@@ -575,7 +568,7 @@
       </div>
     </div>
 
-    <!-- TAB 6: TOPIC 5 - ยอดขาย Type Board -->
+    <!-- TAB 6: TOPIC 5 -->
     <div id="content-topic5" class="tab-content hidden space-y-6">
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="border-b border-slate-100 pb-3 mb-5">
@@ -601,7 +594,6 @@
           </div>
         </div>
 
-        <!-- Board Type Breakdown Table -->
         <div class="mt-6">
           <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">ตารางสรุปรายละเอียด Type Board</h4>
           <div class="overflow-x-auto">
@@ -670,6 +662,9 @@
 
   <!-- App JavaScript Logic -->
   <script>
+    // Google Sheets Published CSV URL
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2YiIflNmhO84CSad8fueu9QFE1wc7-CoCwGA1gyTG4f2_jIWGqqeeQ4Hd56ggcMehr6UeA0Yi8meR/pub?gid=1655325939&single=true&output=csv";
+
     // State management
     let rawSalesData = [];
     let filteredData = [];
@@ -708,7 +703,7 @@
     async function saveDatasetToStorage(data, filename) {
       const record = {
         id: 'active_dataset',
-        filename: filename || 'ไฟล์ที่อัปโหลด',
+        filename: filename || 'Google Sheet',
         updatedAt: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
         data: data
       };
@@ -759,7 +754,7 @@
     }
 
     async function clearStoredData() {
-      if (!confirm('คุณต้องการล้างข้อมูลที่บันทึกไว้ในแคช และโหลดไฟล์เริ่มต้นใหม่หรือไม่?')) return;
+      if (!confirm('คุณต้องการล้างข้อมูลที่บันทึกไว้ในแคช และโหลดข้อมูลใหม่จาก Google Sheets หรือไม่?')) return;
       try {
         const db = await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -771,7 +766,7 @@
       filteredData = [];
       document.getElementById('dataSourceBadge').classList.add('hidden');
       document.getElementById('filteredCountBadge').innerText = "กำลังรีโหลดข้อมูล...";
-      loadData(true);
+      fetchFromGoogleSheet(true);
     }
 
     function updateDataSourceBadge(filename, timestamp) {
@@ -784,9 +779,8 @@
       }
     }
 
-    // Load CSV Data with persistent caching
+    // Load CSV Data with persistent caching & Google Sheet default
     async function loadData(forceFresh = false) {
-      // 1. First check if we have saved data in storage (unless forcing fresh reload)
       if (!forceFresh) {
         const stored = await getDatasetFromStorage();
         if (stored && stored.data && stored.data.length > 0) {
@@ -798,25 +792,107 @@
         }
       }
 
-      // 2. Fallback: Fetch default CSV file if available
-      Papa.parse("Sale order Flooring 2025-2026 - Sheet1.csv", {
-        download: true,
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: async function(results) {
-          if (results.data && results.data.length > 0) {
-            rawSalesData = results.data.filter(row => row['Years (Billing Date)'] && row['Sum of m2'] !== undefined);
-            await saveDatasetToStorage(rawSalesData, 'Sale order Flooring 2025-2026.csv');
-            initDropdowns();
-            applyFilters();
+      await fetchFromGoogleSheet(false);
+    }
+
+    // Fetch live data directly from Google Sheets (handles CORS & local file:// restriction)
+    async function fetchFromGoogleSheet(isManualTrigger = false) {
+      document.getElementById('filteredCountBadge').innerText = "กำลังเชื่อมต่อและดึงข้อมูลจาก Google Sheets...";
+
+      // Helper function for PapaParse execution
+      const parseCSVString = (csvString, filename) => {
+        Papa.parse(csvString, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            if (results.data && results.data.length > 0) {
+              const validRows = results.data.filter(row => row['Years (Billing Date)'] && row['Sum of m2'] !== undefined);
+              if (validRows.length > 0) {
+                rawSalesData = validRows;
+                await saveDatasetToStorage(rawSalesData, filename);
+                initDropdowns();
+                applyFilters();
+                if (isManualTrigger) {
+                  alert(`✅ อัปเดตข้อมูลจาก Google Sheets สำเร็จ (${rawSalesData.length.toLocaleString()} รายการ)`);
+                }
+                return;
+              }
+            }
+            alert("⚠️ ไม่พบข้อมูลที่ถูกต้องจาก Google Sheets");
+          },
+          error: function(err) {
+            alert("เกิดข้อผิดพลาดในการประมวลผลข้อมูล: " + err.message);
           }
-        },
-        error: function(err) {
-          console.warn("Could not load CSV via fetch. Waiting for manual upload.", err);
-          document.getElementById('filteredCountBadge').innerText = "กรุณาคลิก 'อัปโหลด CSV ใหม่' ด้านบนเพื่อเลือกไฟล์";
+        });
+      };
+
+      // 1. Direct Fetch Attempt
+      try {
+        const response = await fetch(GOOGLE_SHEET_CSV_URL);
+        if (response.ok) {
+          const csvText = await response.text();
+          parseCSVString(csvText, "Google Sheet (ดึงสด)");
+          return;
         }
-      });
+      } catch (err) {
+        console.warn("Direct fetch blocked (CORS/Local File), trying CORS Proxies...", err);
+      }
+
+      // 2. CORS Proxies Fallback Chain (สำหรับกรณีรันบน Server หรือติด CORS)
+      const proxyList = [
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://thingproxy.freeboard.io/fetch/${url}`
+      ];
+
+      for (let i = 0; i < proxyList.length; i++) {
+        try {
+          const proxyUrl = proxyList[i](GOOGLE_SHEET_CSV_URL);
+          const response = await fetch(proxyUrl);
+          if (response.ok) {
+            const csvText = await response.text();
+            if (csvText && csvText.trim().length > 0) {
+              parseCSVString(csvText, `Google Sheet (ผ่าน Proxy #${i+1})`);
+              return;
+            }
+          }
+        } catch (proxyErr) {
+          console.warn(`Proxy #${i+1} failed:`, proxyErr);
+        }
+      }
+
+      // 3. JSONP Fallback (การันตีทำงานบน file:// โดยไม่ติด CORS Policy ของเบราว์เซอร์)
+      try {
+        const jsonpUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(GOOGLE_SHEET_CSV_URL)}&callback=handleGoogleSheetJSONP`;
+        
+        window.handleGoogleSheetJSONP = function(response) {
+          if (response && response.contents) {
+            parseCSVString(response.contents, "Google Sheet (ผ่าน JSONP Bypass)");
+          } else {
+            throw new Error("JSONP response empty");
+          }
+          // Clean up script tag
+          const scriptTag = document.getElementById('jsonp-cors-script');
+          if (scriptTag) scriptTag.remove();
+          delete window.handleGoogleSheetJSONP;
+        };
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-cors-script';
+        script.src = jsonpUrl;
+        script.onerror = function() {
+          throw new Error("JSONP Script Load Error");
+        };
+        document.body.appendChild(script);
+        return;
+      } catch (jsonpErr) {
+        console.error("JSONP fetch failed:", jsonpErr);
+      }
+
+      // If all methods fail
+      document.getElementById('filteredCountBadge').innerText = "ดึงข้อมูลล้มเหลว กรุณาใช้อัปโหลด CSV แทน";
+      alert("❌ ไม่สามารถดึงข้อมูลอัตโนมัติได้เนื่องจากเงื่อนไขความปลอดภัยของระบบ/เครือข่าย\nกรุณาใช้ปุ่ม 'อัปโหลด CSV' เพื่อเลือกไฟล์ขี้แจงข้อมูลด้วยตนเอง");
     }
 
     async function handleFileUpload(event) {
