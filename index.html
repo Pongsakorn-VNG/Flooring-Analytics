@@ -1788,19 +1788,23 @@
     }
 
     // Function ส่งออก PDF
-    function exportPDF() {
-      const element = document.getElementById('dashboardContent');
-      
-      const opt = {
-        margin:       [0.3, 0.3, 0.3, 0.3],
-        filename:     `flooring_sales_report_${new Date().toISOString().slice(0,10)}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-      };
+    async function exportPDF() {
+  const element = document.getElementById('dashboardContent');
 
-      html2pdf().set(opt).from(element).save();
-    }
+  // คำนวณความกว้างและความสูงของ element ในหน่วย Inches (ใช้อัตราส่วน 96px ต่อ inch)
+  const widthInInches = element.offsetWidth / 96;
+  const heightInInches = element.offsetHeight / 96;
+
+  const opt = {
+    margin:       0, // ลดระยะขอบเพื่อไม่ให้เสียพื้นที่
+    filename:     `flooring_sales_report_${new Date().toISOString().slice(0,10)}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    jsPDF:        { unit: 'in', format: [widthInInches, heightInInches], orientation: 'landscape' }
+  };
+
+  html2pdf().set(opt).from(element).save();
+}
   </script>
 </body>
 </html>
