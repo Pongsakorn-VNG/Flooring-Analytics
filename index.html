@@ -1792,12 +1792,6 @@
     async function exportPDF() {
   const element = document.getElementById('dashboardContent');
 
-      /* ป้องกันการตัดแบ่ง Element กลางคัน */
-#dashboardContent * {
-  page-break-inside: avoid;
-  break-inside: avoid;
-}
-
   // คำนวณความกว้างและความสูงของ element ในหน่วย Inches (ใช้อัตราส่วน 96px ต่อ inch)
   const widthInInches = element.offsetWidth / 96;
   const heightInInches = element.offsetHeight / 96;
