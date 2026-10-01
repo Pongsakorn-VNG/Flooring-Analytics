@@ -13,6 +13,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- PapaParse for CSV parsing -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- html2pdf.js for Export PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -58,7 +60,7 @@
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
 
   <!-- Navigation Bar -->
-  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm" id="headerNav">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
@@ -99,12 +101,17 @@
           <i data-lucide="download" class="w-3.5 h-3.5"></i>
           ส่งออก CSV
         </button>
+        <!-- เพิ่มปุ่ม Export PDF -->
+        <button onclick="exportPDF()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition">
+          <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+          ส่งออก PDF
+        </button>
       </div>
     </div>
   </header>
 
   <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" id="dashboardContent">
 
     <!-- Filters Section -->
     <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
@@ -669,6 +676,7 @@
     let rawSalesData = [];
     let filteredData = [];
     let charts = {};
+    let currentTab = 'overview';
 
     const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -795,11 +803,10 @@
       await fetchFromGoogleSheet(false);
     }
 
-    // Fetch live data directly from Google Sheets (handles CORS & local file:// restriction)
+    // Fetch live data directly from Google Sheets
     async function fetchFromGoogleSheet(isManualTrigger = false) {
       document.getElementById('filteredCountBadge').innerText = "กำลังเชื่อมต่อและดึงข้อมูลจาก Google Sheets...";
 
-      // Helper function for PapaParse execution
       const parseCSVString = (csvString, filename) => {
         Papa.parse(csvString, {
           header: true,
@@ -827,7 +834,6 @@
         });
       };
 
-      // 1. Direct Fetch Attempt
       try {
         const response = await fetch(GOOGLE_SHEET_CSV_URL);
         if (response.ok) {
@@ -836,10 +842,9 @@
           return;
         }
       } catch (err) {
-        console.warn("Direct fetch blocked (CORS/Local File), trying CORS Proxies...", err);
+        console.warn("Direct fetch blocked, trying CORS Proxies...", err);
       }
 
-      // 2. CORS Proxies Fallback Chain (สำหรับกรณีรันบน Server หรือติด CORS)
       const proxyList = [
         url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
         url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -862,7 +867,6 @@
         }
       }
 
-      // 3. JSONP Fallback (การันตีทำงานบน file:// โดยไม่ติด CORS Policy ของเบราว์เซอร์)
       try {
         const jsonpUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(GOOGLE_SHEET_CSV_URL)}&callback=handleGoogleSheetJSONP`;
         
@@ -872,7 +876,6 @@
           } else {
             throw new Error("JSONP response empty");
           }
-          // Clean up script tag
           const scriptTag = document.getElementById('jsonp-cors-script');
           if (scriptTag) scriptTag.remove();
           delete window.handleGoogleSheetJSONP;
@@ -890,9 +893,8 @@
         console.error("JSONP fetch failed:", jsonpErr);
       }
 
-      // If all methods fail
       document.getElementById('filteredCountBadge').innerText = "ดึงข้อมูลล้มเหลว กรุณาใช้อัปโหลด CSV แทน";
-      alert("❌ ไม่สามารถดึงข้อมูลอัตโนมัติได้เนื่องจากเงื่อนไขความปลอดภัยของระบบ/เครือข่าย\nกรุณาใช้ปุ่ม 'อัปโหลด CSV' เพื่อเลือกไฟล์ขี้แจงข้อมูลด้วยตนเอง");
+      alert("❌ ไม่สามารถดึงข้อมูลอัตโนมัติได้\nกรุณาใช้ปุ่ม 'อัปโหลด CSV' เพื่อเลือกไฟล์ด้วยตนเอง");
     }
 
     async function handleFileUpload(event) {
@@ -908,14 +910,14 @@
         complete: async function(results) {
           const validRows = results.data.filter(row => row['Years (Billing Date)'] && row['Sum of m2'] !== undefined);
           if (validRows.length === 0) {
-            alert('ไม่พบแถวข้อมูลที่ถูกต้องในไฟล์ CSV นี้ กรุณาตรวจสอบหัวคอลัมน์');
+            alert('ไม่พบแถวข้อมูลที่ถูกต้องในไฟล์ CSV นี้');
             return;
           }
           rawSalesData = validRows;
           await saveDatasetToStorage(rawSalesData, file.name);
           initDropdowns();
           applyFilters();
-          alert(`✅ อัปโหลดและบันทึกข้อมูลเรียบร้อยแล้ว (${rawSalesData.length.toLocaleString()} แถว)\nข้อมูลจะยังคงอยู่แม้จะกด Refresh หน้าเว็บ`);
+          alert(`✅ อัปโหลดและบันทึกข้อมูลเรียบร้อยแล้ว (${rawSalesData.length.toLocaleString()} แถว)`);
         },
         error: function(err) {
           alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ' + err.message);
@@ -924,7 +926,6 @@
     }
 
     function initDropdowns() {
-      // Board Types
       const types = [...new Set(rawSalesData.map(r => r.Type2).filter(Boolean))].sort();
       const typeSelect = document.getElementById('filterType');
       typeSelect.innerHTML = '<option value="ALL">ทุกประเภท (All Types)</option>';
@@ -932,7 +933,6 @@
         typeSelect.innerHTML += `<option value="${t}">${t}</option>`;
       });
 
-      // Customers
       const customers = [...new Set(rawSalesData.map(r => r['Payer Name2']).filter(Boolean))].sort();
       const custSelect = document.getElementById('filterCustomer');
       custSelect.innerHTML = '<option value="ALL">ทุกลูกค้า (All Customers)</option>';
@@ -972,13 +972,17 @@
       document.getElementById('filteredCountBadge').innerText = `พบ ${filteredData.length.toLocaleString()} รายการ`;
       
       updateKPIs();
-      renderOverviewTab();
-      renderTopic1();
-      renderTopic2();
-      renderTopic3();
-      renderTopic4();
-      renderTopic5();
-      renderRawTable();
+      renderActiveTabContent();
+    }
+
+    function renderActiveTabContent() {
+      if (currentTab === 'overview') renderOverviewTab();
+      else if (currentTab === 'topic1') renderTopic1();
+      else if (currentTab === 'topic2') renderTopic2();
+      else if (currentTab === 'topic3') renderTopic3();
+      else if (currentTab === 'topic4') renderTopic4();
+      else if (currentTab === 'topic5') renderTopic5();
+      else if (currentTab === 'table') renderRawTable();
     }
 
     function formatNumber(num) {
@@ -1002,7 +1006,6 @@
       document.getElementById('kpiLocalRatio').innerText = `สัดส่วน: ${localPct}%`;
       document.getElementById('kpiExportRatio').innerText = `สัดส่วน: ${exportPct}%`;
 
-      // Top Customer
       const custMap = {};
       filteredData.forEach(r => {
         const c = r['Payer Name2'] || 'Unknown';
@@ -1012,7 +1015,6 @@
       document.getElementById('kpiTopCustomer').innerText = topCust[0];
       document.getElementById('kpiTopCustomerVol').innerText = `ยอด: ${formatNumber(topCust[1])} ตร.ม.`;
 
-      // Top Color Code
       const colorMap = {};
       filteredData.forEach(r => {
         const c = r['Color Code'] || 'Unknown';
@@ -1023,8 +1025,9 @@
       document.getElementById('kpiTopColorVol').innerText = `ยอด: ${formatNumber(topColor[1])} ตร.ม.`;
     }
 
-    // Tab Switching
+    // Tab Switching (แก้ไขเพื่อให้ Render กราฟอย่างถูกต้องเมื่อเปิดแท็บ)
     function switchTab(tabId) {
+      currentTab = tabId;
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('border-sky-600', 'text-sky-600', 'bg-sky-50/50');
         btn.classList.add('border-transparent', 'text-slate-600');
@@ -1041,7 +1044,8 @@
         activeContent.classList.remove('hidden');
       }
 
-      window.dispatchEvent(new Event('resize'));
+      // แสดงผลเนื้อหาและ Render กราฟใหม่ตามแท็บที่เปิด
+      renderActiveTabContent();
     }
 
     // TAB: OVERVIEW
@@ -1098,7 +1102,6 @@
         }
       });
 
-      // Mini Donut: Market
       const totalLocal = localMonthly.reduce((a, b) => a + b, 0);
       const totalExport = exportMonthly.reduce((a, b) => a + b, 0);
       if (charts.marketMini) charts.marketMini.destroy();
@@ -1123,7 +1126,6 @@
         }
       });
 
-      // Mini Donut: Thickness
       const thickMap = { '8': 0, '12': 0 };
       filteredData.forEach(r => {
         const th = String(r['Thickness (mm)']);
@@ -1151,7 +1153,6 @@
         }
       });
 
-      // Top 5 Customers List
       const custMap = {};
       filteredData.forEach(r => {
         const c = r['Payer Name2'] || 'Unknown';
@@ -1176,7 +1177,6 @@
         `;
       }).join('');
 
-      // Top 5 Colors List
       const colorMap = {};
       filteredData.forEach(r => {
         const c = r['Color Code'] || 'Unknown';
@@ -1199,7 +1199,6 @@
         `;
       }).join('');
 
-      // Board Type List
       const typeMap = {};
       filteredData.forEach(r => {
         const t = r.Type2 || 'Other';
@@ -1234,7 +1233,6 @@
       document.getElementById('t1ExportTotal').innerText = `${formatNumber(exportSum)} ตร.ม.`;
       document.getElementById('t1ExportPct').innerText = `สัดส่วน ${((exportSum/total)*100).toFixed(1)}%`;
 
-      // Donut Chart
       if (charts.topic1Donut) charts.topic1Donut.destroy();
       const ctxD = document.getElementById('chartTopic1Donut').getContext('2d');
       charts.topic1Donut = new Chart(ctxD, {
@@ -1262,7 +1260,6 @@
         }
       });
 
-      // Monthly Stacked Chart
       const localMonthly = new Array(12).fill(0);
       const exportMonthly = new Array(12).fill(0);
       filteredData.forEach(r => {
@@ -1308,7 +1305,6 @@
         }
       });
 
-      // Year Breakdown Table
       const yearMap = {};
       filteredData.forEach(r => {
         const yr = r['Years (Billing Date)'] || 'Unknown';
@@ -1356,7 +1352,6 @@
       const top15 = sortedCust.slice(0, 15);
       const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
 
-      // Horizontal Bar Chart
       if (charts.topic2Bar) charts.topic2Bar.destroy();
       const ctxB = document.getElementById('chartTopic2Customers').getContext('2d');
       charts.topic2Bar = new Chart(ctxB, {
@@ -1389,7 +1384,6 @@
         }
       });
 
-      // Pie Chart Top 5 + Others
       const top5Cust = sortedCust.slice(0, 5);
       const otherCustTotal = sortedCust.slice(5).reduce((a, c) => a + c[1].total, 0);
       const pieLabels = top5Cust.map(c => c[0]);
@@ -1421,7 +1415,6 @@
         }
       });
 
-      // Full Table
       const tbody = document.getElementById('tableTopic2Body');
       tbody.innerHTML = sortedCust.map(([name, s], idx) => {
         const pct = ((s.total / totalAll) * 100).toFixed(1);
@@ -1469,7 +1462,6 @@
       const top15Colors = sortedColors.slice(0, 15);
       const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
 
-      // Stats
       document.getElementById('t3TotalColorCodes').innerText = `${sortedColors.length} รหัสสี`;
       if (sortedColors.length > 0) {
         document.getElementById('t3TopColorCodeName').innerText = sortedColors[0][0];
@@ -1478,7 +1470,6 @@
       const top5Sum = sortedColors.slice(0, 5).reduce((a, c) => a + c[1].total, 0);
       document.getElementById('t3Top5Share').innerText = `${((top5Sum/totalAll)*100).toFixed(1)}%`;
 
-      // Chart
       if (charts.topic3Bar) charts.topic3Bar.destroy();
       const ctxC = document.getElementById('chartTopic3Colors').getContext('2d');
       charts.topic3Bar = new Chart(ctxC, {
@@ -1510,7 +1501,6 @@
         }
       });
 
-      // Table
       const tbody = document.getElementById('tableTopic3Body');
       tbody.innerHTML = sortedColors.map(([code, s], idx) => {
         const pct = ((s.total / totalAll) * 100).toFixed(1);
@@ -1562,7 +1552,6 @@
       document.getElementById('t4_12mmTotal').innerText = `${formatNumber(sum12)} ตร.ม.`;
       document.getElementById('t4_12mmPct').innerText = `สัดส่วน ${((sum12/total)*100).toFixed(1)}%`;
 
-      // Donut Chart
       if (charts.topic4Donut) charts.topic4Donut.destroy();
       const ctxD = document.getElementById('chartTopic4Donut').getContext('2d');
       charts.topic4Donut = new Chart(ctxD, {
@@ -1590,7 +1579,6 @@
         }
       });
 
-      // Monthly Chart
       if (charts.topic4Monthly) charts.topic4Monthly.destroy();
       const ctxM = document.getElementById('chartTopic4Monthly').getContext('2d');
       charts.topic4Monthly = new Chart(ctxM, {
@@ -1625,7 +1613,6 @@
         }
       });
 
-      // Thickness by Board Type Table
       const typeThickMap = {};
       filteredData.forEach(r => {
         const t = r.Type2 || 'Other';
@@ -1672,7 +1659,6 @@
       const sortedTypes = Object.entries(typeMap).sort((a, b) => b[1].total - a[1].total);
       const totalAll = filteredData.reduce((a, r) => a + (Number(r['Sum of m2']) || 0), 0) || 1;
 
-      // Donut Chart
       if (charts.topic5Donut) charts.topic5Donut.destroy();
       const ctxD = document.getElementById('chartTopic5Donut').getContext('2d');
       charts.topic5Donut = new Chart(ctxD, {
@@ -1700,7 +1686,6 @@
         }
       });
 
-      // Bar Chart Breakdown Local / Export
       if (charts.topic5Bar) charts.topic5Bar.destroy();
       const ctxB = document.getElementById('chartTopic5Bar').getContext('2d');
       charts.topic5Bar = new Chart(ctxB, {
@@ -1735,7 +1720,6 @@
         }
       });
 
-      // Table
       const tbody = document.getElementById('tableTopic5Body');
       tbody.innerHTML = sortedTypes.map(([typeName, s]) => {
         const pct = ((s.total / totalAll) * 100).toFixed(1);
@@ -1801,6 +1785,21 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    }
+
+    // Function ส่งออก PDF
+    function exportPDF() {
+      const element = document.getElementById('dashboardContent');
+      
+      const opt = {
+        margin:       [0.3, 0.3, 0.3, 0.3],
+        filename:     `flooring_sales_report_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save();
     }
   </script>
 </body>
